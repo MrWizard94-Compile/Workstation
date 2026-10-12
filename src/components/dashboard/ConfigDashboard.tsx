@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { useStore } from '../../store';
-import { Lock, Unlock, Database, Cloud, ScrollText, Wrench, Download, Trash2, CheckCircle2, Plus } from 'lucide-react';
+import { Database, Cloud, ScrollText, Download, Trash2, CheckCircle2, Plus } from 'lucide-react';
 import { getAvailableModels, checkModelCached, deleteModelCache, addCustomModel, removeCustomModel, pullModel } from '../../lib/llm';
+import { LEGACY_SOUL_STORAGE_KEY, MAX_PERSONA_LENGTH, PERSONA_STORAGE_KEY, readLegacySoul, readPersona } from '../../lib/persona';
 
 function ModelList() {
   const [modelStatus, setModelStatus] = useState<Record<string, boolean>>({});
@@ -138,47 +138,43 @@ function ModelList() {
 }
 
 export function ConfigDashboard() {
-  const { pinVerified, setPinVerified } = useStore();
-  const [pinInput, setPinInput] = useState('');
-  const [soulContent, setSoulContent] = useState('');
-  const [isSaving, setIsSaving] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-
-  const EXPECTED_PIN = "666";
+  const [persona, setPersona] = useState('');
+  const [legacySoul, setLegacySoul] = useState<string | null>(null);
+  const [status, setStatus] = useState('');
 
   useEffect(() => {
-    const fetchSoul = async () => {
-      const stored = localStorage.getItem('soul_config');
-      if (stored) {
-        setSoulContent(stored);
-      } else {
-        try {
-          const res = await fetch('/SOULv2.0.0.md');
-          const text = await res.text();
-          setSoulContent(text);
-          localStorage.setItem('soul_config', text);
-        } catch (e) {
-          console.error('Failed to load SOUL.md', e);
-        }
-      }
-    };
-    fetchSoul();
+    setPersona(readPersona(localStorage));
+    setLegacySoul(readLegacySoul(localStorage));
   }, []);
 
-  const handlePinSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (pinInput === EXPECTED_PIN) {
-      setPinVerified(true);
-      setErrorMsg('');
-    } else {
-      setErrorMsg('INCORRECT SEAL. ACCESS DENIED.');
+  const savePersona = () => {
+    try {
+      localStorage.setItem(PERSONA_STORAGE_KEY, persona);
+      setStatus('Local persona saved. It does not amend the WPAI Constitution.');
+    } catch {
+      setStatus('Browser storage is unavailable; the persona was not saved.');
     }
   };
 
-  const saveSoul = () => {
-    setIsSaving(true);
-    localStorage.setItem('soul_config', soulContent);
-    setTimeout(() => setIsSaving(false), 800);
+  const exportLegacySoul = () => {
+    if (legacySoul === null) return;
+    const url = URL.createObjectURL(new Blob([legacySoul], { type: 'text/plain;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'workstation-legacy-soul.txt';
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const clearLegacySoul = () => {
+    if (!window.confirm('Delete the browser-stored legacy SOUL draft? Export it first if you want a copy.')) return;
+    try {
+      localStorage.removeItem(LEGACY_SOUL_STORAGE_KEY);
+      setLegacySoul(null);
+      setStatus('Legacy browser draft removed. Its tracked original remains recoverable in Git history.');
+    } catch {
+      setStatus('Browser storage is unavailable; the legacy draft was not removed.');
+    }
   };
 
   return (
@@ -195,27 +191,16 @@ export function ConfigDashboard() {
           <Database className="text-brimstone-500" />
           <h3 className="text-xl font-sans tracking-wide text-gray-200 uppercase">Demonic Entities (Models)</h3>
         </div>
-        <p className="text-sm text-gray-400">Manage local neural networks. Downloaded models are cached in your browser's local storage.</p>
+        <p className="text-sm text-gray-400">Manage local neural networks. Downloaded models use your browser's model cache.</p>
         <ModelList />
       </div>
 
       <div className="industrial-panel p-6 rounded-lg space-y-4">
         <div className="flex items-center gap-3 border-b border-forge-700 pb-4">
-          <Wrench className="text-brimstone-500" />
-          <h3 className="text-xl font-sans tracking-wide text-gray-200 uppercase">Tool Binding</h3>
+          <ScrollText className="text-brimstone-500" />
+          <h3 className="text-xl font-sans tracking-wide text-gray-200 uppercase">Local Chat Capabilities</h3>
         </div>
-        <p className="text-sm text-gray-400">The entity is bound with ALL THE TOOLS (Custom Function Calling enabled).</p>
-        <div className="flex gap-2 flex-wrap">
-          <span className="px-3 py-1 bg-forge-900 border border-forge-700 rounded text-xs text-gray-500 shadow-inner hover:text-brimstone-500 hover:border-brimstone-500/50 transition-colors cursor-pointer">search_database()</span>
-          <span className="px-3 py-1 bg-forge-900 border border-forge-700 rounded text-xs text-gray-500 shadow-inner hover:text-brimstone-500 hover:border-brimstone-500/50 transition-colors cursor-pointer">modify_soul()</span>
-          <span className="px-3 py-1 bg-forge-900 border border-forge-700 rounded text-xs text-gray-500 shadow-inner hover:text-brimstone-500 hover:border-brimstone-500/50 transition-colors cursor-pointer">cast_hellfire()</span>
-          <span className="px-3 py-1 bg-forge-900 border border-forge-700 rounded text-xs text-gray-500 shadow-inner hover:text-brimstone-500 hover:border-brimstone-500/50 transition-colors cursor-pointer">sys_vectorize_logs()</span>
-          <span className="px-3 py-1 bg-forge-900 border border-forge-700 rounded text-xs text-gray-500 shadow-inner hover:text-brimstone-500 hover:border-brimstone-500/50 transition-colors cursor-pointer">filesystem_read()</span>
-          <span className="px-3 py-1 bg-forge-900 border border-forge-700 rounded text-xs text-gray-500 shadow-inner hover:text-brimstone-500 hover:border-brimstone-500/50 transition-colors cursor-pointer">filesystem_write()</span>
-          <span className="px-3 py-1 bg-forge-900 border border-forge-700 rounded text-xs text-gray-500 shadow-inner hover:text-brimstone-500 hover:border-brimstone-500/50 transition-colors cursor-pointer">web_search()</span>
-          <span className="px-3 py-1 bg-forge-900 border border-forge-700 rounded text-xs text-gray-500 shadow-inner hover:text-brimstone-500 hover:border-brimstone-500/50 transition-colors cursor-pointer">generate_image()</span>
-          <span className="px-3 py-1 bg-forge-900 border border-forge-700 rounded text-xs text-gray-500 shadow-inner hover:text-brimstone-500 hover:border-brimstone-500/50 transition-colors cursor-pointer">generate_video()</span>
-        </div>
+        <p className="text-sm text-gray-400">The browser model can converse. This app does not execute model-requested tools or grant it file, database, web, image, or video access.</p>
       </div>
 
       <div className="industrial-panel p-6 rounded-lg space-y-4 opacity-75">
@@ -232,56 +217,26 @@ export function ConfigDashboard() {
       <div className="industrial-panel border-blood-500/30 p-6 rounded-lg space-y-4 mb-12">
         <div className="flex items-center gap-3 border-b border-blood-500/20 pb-4">
           <ScrollText className="text-blood-500" />
-          <h3 className="text-xl font-sans tracking-wide text-red-500 uppercase">SOULv2.0.0.md - The Constitution</h3>
+          <h3 className="text-xl font-sans tracking-wide text-red-500 uppercase">Local Character Persona</h3>
         </div>
-
-        {!pinVerified ? (
-          <form onSubmit={handlePinSubmit} className="space-y-4 py-8">
-            <div className="flex items-center justify-center gap-4">
-              <Lock className="w-8 h-8 text-forge-600" />
-              <div className="flex flex-col gap-2 w-64">
-                <input
-                  type="password"
-                  value={pinInput}
-                  onChange={(e) => setPinInput(e.target.value)}
-                  placeholder="Enter PIN (666)"
-                  className="bg-forge-900 border border-forge-600 rounded p-3 text-center tracking-[0.5em] focus:border-blood-500 outline-none w-full shadow-inner"
-                  maxLength={6}
-                />
-                <button type="submit" className="w-full bg-forge-800 border border-blood-500/50 hover:bg-blood-500/20 hover:border-blood-500 text-gray-300 hover:text-white font-bold py-2 rounded transition-all">
-                  BREAK THE SEAL
-                </button>
-                {errorMsg && <p className="text-red-500 text-sm text-center font-bold animate-pulse mt-2">{errorMsg}</p>}
-              </div>
+        <p className="text-sm text-gray-400">This text only styles the local chat character. It is not agent law. The binding <a className="text-brimstone-500 underline" href="https://github.com/MrWizard94-Compile/Agents-Constitution" target="_blank" rel="noopener noreferrer">WPAI Constitution</a> lives on GitHub.</p>
+        <textarea
+          value={persona}
+          onChange={(e) => setPersona(e.target.value)}
+          maxLength={MAX_PERSONA_LENGTH}
+          aria-label="Local character persona"
+          className="w-full h-48 bg-forge-900 border border-blood-500/30 rounded p-4 text-gray-300 font-mono text-sm focus:outline-none focus:border-brimstone-500/50 shadow-inner"
+        />
+        <button onClick={savePersona} className="px-6 py-2 bg-forge-800 border border-blood-500 hover:bg-blood-500/20 text-gray-200 font-bold rounded transition-colors tracking-widest uppercase">Save Local Persona</button>
+        {status && <p role="status" className="text-sm text-gray-300">{status}</p>}
+        {legacySoul !== null && (
+          <div className="border-t border-forge-700 pt-4 space-y-3">
+            <h4 className="font-bold text-gray-200">Legacy SOUL browser draft</h4>
+            <p className="text-sm text-gray-400">An old browser-stored draft was found. It is no longer sent to the model. Export it before clearing if it contains edits you want to keep.</p>
+            <div className="flex gap-3 flex-wrap">
+              <button onClick={exportLegacySoul} className="px-4 py-2 bg-forge-800 border border-forge-600 text-gray-200 rounded">Export legacy draft</button>
+              <button onClick={clearLegacySoul} className="px-4 py-2 bg-forge-800 border border-blood-500 text-red-300 rounded">Clear legacy browser draft</button>
             </div>
-          </form>
-        ) : (
-          <div className="space-y-4 animate-in fade-in duration-500">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-brimstone-500">
-                <Unlock className="w-5 h-5" />
-                <span className="text-sm font-bold tracking-widest uppercase">Seal Broken. Editing Permitted.</span>
-              </div>
-              <button
-                onClick={() => setPinVerified(false)}
-                className="text-xs text-gray-500 hover:text-gray-300 underline uppercase tracking-wider"
-              >
-                Re-Seal Constitution
-              </button>
-            </div>
-
-            <textarea
-              value={soulContent}
-              onChange={(e) => setSoulContent(e.target.value)}
-              className="w-full h-[500px] bg-forge-900 border border-blood-500/30 rounded p-4 text-gray-300 font-mono text-sm focus:outline-none focus:border-brimstone-500/50 shadow-inner"
-            />
-
-            <button
-              onClick={saveSoul}
-              className="px-6 py-2 bg-forge-800 border border-blood-500 hover:bg-blood-500/20 text-gray-200 font-bold rounded transition-colors tracking-widest uppercase"
-            >
-              {isSaving ? 'INSCRIBING...' : 'SAVE CONSTITUTION'}
-            </button>
           </div>
         )}
       </div>

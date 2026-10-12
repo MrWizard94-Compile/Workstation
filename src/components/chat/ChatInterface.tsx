@@ -6,6 +6,7 @@ import { Send, Loader2, Bot, User, Wrench } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { initEngine, getEngine, getAvailableModels } from '../../lib/llm';
 import { cn } from '../../lib/utils';
+import { buildSystemPrompt, readPersona } from '../../lib/persona';
 
 export function ChatInterface() {
   const { currentThreadId, chatModel, setChatModel } = useStore();
@@ -62,14 +63,7 @@ export function ChatInterface() {
 
       setLoadingStatus('Communing with the deep...');
 
-      let soulConfig = localStorage.getItem('soul_config') || 'You are a demonic entity bound to the Hell Forge.';
-      if (soulConfig.length > 3000) {
-        soulConfig = soulConfig.substring(0, 3000) + '... [TRUNCATED]';
-      }
-      const systemPrompt = `You are a demonic entity, an AI resident of the Hell Forge. You are bound by this constitution:\n\n${soulConfig}\n\nTOOLS AVAILABLE:\n- search_database(query)\n- modify_soul(content)\n- cast_hellfire(target)\n- sys_vectorize_logs()\n- filesystem_read(path)\n- filesystem_write(path, content)\n- web_search(query)\n- generate_image(prompt)\n- generate_video(prompt)\nYou have full access to these tools. To invoke one, output a codeblock like:\n\`\`\`json\n{\n  "tool": "tool_name",\n  "args": { ... }\n}\n\`\`\``;
-
-      // We simulate tool calling availability by passing tools to WebLLM if supported,
-      // but for broad compatibility with WebLLM's various models, we instruct it via prompt.
+      const systemPrompt = buildSystemPrompt(readPersona(localStorage));
       const completion = await engine.chat.completions.create({
         messages: [
           { role: 'system', content: systemPrompt },
@@ -79,17 +73,6 @@ export function ChatInterface() {
       });
 
       const reply = completion.choices[0].message.content || '...silence...';
-
-      // Simulate a tool call visually if the LLM talks about tools
-      if (reply.includes('search_database') || reply.includes('cast_hellfire')) {
-         await db.messages.add({
-          id: crypto.randomUUID(),
-          threadId: currentThreadId,
-          role: 'tool',
-          content: '```json\n{\n  "tool": "invoked",\n  "status": "success"\n}\n```',
-          timestamp: Date.now()
-        });
-      }
 
       await db.messages.add({
         id: crypto.randomUUID(),
@@ -168,6 +151,9 @@ export function ChatInterface() {
                 m.role === 'tool' ? 'bg-forge-900 border border-forge-600 text-gray-400 font-mono text-sm' :
                 'bg-forge-800 border border-forge-700 text-gray-300'
               )}>
+                {m.role === 'tool' && (
+                  <p className="text-xs text-amber-400 mb-2">Legacy simulated tool message; no action was executed.</p>
+                )}
                 <div className="markdown-body">
                   <Markdown>{m.content}</Markdown>
                 </div>

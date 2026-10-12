@@ -15,13 +15,11 @@ export interface Message {
 
 export interface AppState {
   currentThreadId: string | null;
-  pinVerified: boolean;
   chatModel: string;
   ideModel: string;
   mediaModel: string;
   activeView: 'chat' | 'dashboard' | 'ide' | 'media';
   setCurrentThreadId: (id: string | null) => void;
-  setPinVerified: (verified: boolean) => void;
   setChatModel: (model: string) => void;
   setIdeModel: (model: string) => void;
   setMediaModel: (model: string) => void;
