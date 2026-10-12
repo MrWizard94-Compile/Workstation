@@ -1,0 +1,49 @@
+name: Verify Workstation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Workstation
+        uses: actions/checkout@v4
+        with:
+          path: workstation
+      - name: Check out accepted WPAI Constitution source
+        uses: actions/checkout@v4
+        with:
+          repository: MrWizard94-Compile/Agents-Constitution
+          ref: 4f2655fab39c0e4099c518881e1b44cf6602c598
+          path: wpai-constitution
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate the pinned source and Workstation adoption
+        run: |
+          python wpai-constitution/tools/validate-source.py
+          python wpai-constitution/tools/check-adoption.py workstation
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: workstation/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+        working-directory: workstation
+      - name: Type-check, test, build, and audit dependencies
+        run: |
+          npm run lint
+          npm test
+          npm run build
+          npm audit --audit-level=moderate
+        working-directory: workstation
